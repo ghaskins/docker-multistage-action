@@ -3,4 +3,5 @@
         medley/medley {:mvn/version "1.4.0"}
         clj-commons/fs {:mvn/version "1.6.310"}
         cljstache/cljstache {:mvn/version "2.0.6"}
-        pogonos/pogonos {:mvn/version "0.2.1"}}}
+        pogonos/pogonos {:mvn/version "0.2.1"}
+        org.babashka/json {:mvn/version "0.1.6"}}}

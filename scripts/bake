@@ -3,6 +3,7 @@
 (require '[clojure.tools.cli :refer [parse-opts]])
 (require '[clojure.string :as string])
 (require '[babashka.process :refer [shell process exec]])
+(require '[babashka.json :as json])
 (require '[taoensso.timbre :as log])
 (require '[medley.core :as m])
 (require '[pogonos.core :as pg])
@@ -38,6 +39,16 @@ target \"{{name}}\" {
 
 ")
 
+(defn parse-csv [s]
+  (string/split s #","))
+
+(defn parse-tags [s]
+  (let [x (->> (json/read-str s)
+               :tags
+               (map #(string/split % #":")))
+        image (-> x first first)
+        tags (map second x)]
+    {:image image :tags tags}))
 
 (defn render-brackets [s]
   (str "[" s "]"))
@@ -62,9 +73,11 @@ target \"{{name}}\" {
       (m/update-existing :platforms render-csv)
       (as-> $ (pg/render-string hcl-template $))))
 
-(defn exec! [options]
+(defn exec! [{:keys [metadata] :as options}]
   (log/debug "exec!:" options)
-  (let [config-file (str (fs/create-temp-file {:prefix "docker-bake-" :suffix ".hcl"}))
+  (let [{:keys [image tags]} (parse-tags metadata)
+        options (assoc options :image image :tags tags)
+        config-file (str (fs/create-temp-file {:prefix "docker-bake-" :suffix ".hcl"}))
         content (render-template options)]
     (try
       (log/debug "config-file:" config-file)
@@ -83,17 +96,12 @@ target \"{{name}}\" {
                "Options:"
                options-summary]))
 
-(defn parse-csv [s]
-  (string/split s #","))
 
 (def options
   [["-h" "--help"]
    ["-f" "--dockerfile PATH" "The path to a multi-stage dockerfile"
     :default "Dockerfile"]
-   ["-i" "--image NAME" "The base name without tags for the resulting images e.g. docker.io/manetu/foo"]
-   ["-t" "--tags TAGS" "A comma separated list of tags"
-    :default ["latest"]
-    :parse-fn parse-csv]
+   ["-m" "--metadata JSON" "A metadata structure as output from https://github.com/docker/metadata-action"]
    ["-p" "--platforms PLATFORMS" "A comma separated list of platform targets e.g. linux/amd64,linux/arm64"
     :parse-fn parse-csv]
    ["-s" "--stages STAGES" "A comma separated list of stages to build"
