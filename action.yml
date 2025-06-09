@@ -33,3 +33,5 @@ runs:
     - ${{inputs.platforms}}
     - "--stages"
     - ${{inputs.stages}}
+    - "-l"
+    - "trace"
