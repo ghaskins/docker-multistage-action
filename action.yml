@@ -1,0 +1,24 @@
+# action.yml
+name: 'Docker Multistage'
+description: 'Builds a multistage docker container into various tagged images'
+inputs:
+  dockerfile:
+    description: 'The path to a multi-stage dockerfile'
+    required: true
+    default: 'Dockerfile'
+  image:
+    description: 'The base name without tags for the resulting images e.g. docker.io/manetu/foo'
+    required: true
+  tags:
+    description: 'A comma separated list of tags'
+    required: false
+  platforms:
+    description: 'A comma separated list of platform targets e.g. linux/amd64,linux/arm64'
+    required: false
+  stages:
+    description: 'A comma separated list of stages to build'
+    required: true
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

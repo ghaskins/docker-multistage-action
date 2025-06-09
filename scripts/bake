@@ -1,0 +1,124 @@
+#!/usr/bin/env bb
+
+(require '[clojure.tools.cli :refer [parse-opts]])
+(require '[clojure.string :as string])
+(require '[babashka.process :refer [shell process exec]])
+(require '[taoensso.timbre :as log])
+(require '[medley.core :as m])
+(require '[pogonos.core :as pg])
+(require '[manetu.lib.logging :as mlogging])
+(require '[manetu.lib.utils :refer [prep-usage exit] :as utils])
+
+(def hcl-template "
+
+group \"build-all\" {
+  targets = {{{all-stages}}}
+}
+
+target \"_common\" {
+  dockerfile = \"{{dockerfile}}\"
+  {{#platforms}}
+  platforms = {{{platforms}}}
+  {{/platforms}}
+}
+
+target \"default\" {
+  inherits = [\"_common\"]
+}
+
+{{#targets}}
+target \"{{name}}\" {
+  inherits = [\"_common\"]
+  target =  \"{{name}}\"
+  tags = {{{tags}}}
+}
+
+{{/targets}}
+
+")
+
+
+(defn render-brackets [s]
+  (str "[" s "]"))
+
+(defn render-quoted [s]
+  (str "\"" s "\""))
+
+(defn render-csv [coll]
+  (->> coll
+       (map render-quoted)
+       (string/join ", ")
+       (render-brackets)))
+
+(defn render-target [{:keys [image tags] :as options} stage]
+  {:name stage :tags (render-csv (map (fn [tag] (str image ":" tag "-" stage)) tags))})
+
+(defn render-template [{:keys [stages] :as options}]
+  (-> options
+      (assoc :all-stages (render-csv (conj stages "default"))
+             :targets (map (partial render-target options) stages))
+      (m/update-existing :platforms render-csv)
+      (as-> $ (pg/render-string hcl-template $))))
+
+(defn exec! [options]
+  (log/debug "exec!:" options)
+  (let [config-file (str (fs/create-temp-file {:prefix "docker-bake-" :suffix ".hcl"}))
+        content (render-template options)]
+    (try
+      (log/debug "config-file:" config-file)
+      (log/debug "content:" content)
+      (spit config-file content)
+      (shell "docker buildx bake -f" config-file "build-all" "--push")
+      (finally
+        (log/debug "removing:" config-file)
+        (fs/delete config-file)))))
+
+(defn usage [options-summary]
+  (prep-usage ["Usage: build [options]"
+               ""
+               "Bakes a multi-stage, multi-platform docker image with multiple tags"
+               ""
+               "Options:"
+               options-summary]))
+
+(defn parse-csv [s]
+  (string/split s #","))
+
+(def options
+  [["-h" "--help"]
+   ["-f" "--dockerfile PATH" "The path to a multi-stage dockerfile"
+    :default "Dockerfile"]
+   ["-i" "--image NAME" "The base name without tags for the resulting images e.g. docker.io/manetu/foo"]
+   ["-t" "--tags TAGS" "A comma separated list of tags"
+    :default ["latest"]
+    :parse-fn parse-csv]
+   ["-p" "--platforms PLATFORMS" "A comma separated list of platform targets e.g. linux/amd64,linux/arm64"
+    :parse-fn parse-csv]
+   ["-s" "--stages STAGES" "A comma separated list of stages to build"
+    :parse-fn parse-csv]
+   ["-l" "--loglevel LEVEL" mlogging/loglevels-description
+    :default :info
+    :parse-fn keyword
+    :validate [mlogging/loglevels mlogging/loglevels-description]]])
+
+(let [{{:keys [help loglevel] :as options} :options :keys [errors summary] :as x} (parse-opts *command-line-args* options)]
+  (log/set-level! loglevel)
+  (cond
+
+    help
+    (exit 0 (usage summary))
+
+    (not= errors nil)
+    (exit 1 "Error: " (string/join errors))
+
+    :else
+    (try
+      (exec! options)
+      (exit 0 "")
+      (catch Exception e
+        (log/error e)
+        (exit 1 (ex-message e))))))
+
+;; Local Variables:
+;; eval: (clojure-mode)
+;; End:
