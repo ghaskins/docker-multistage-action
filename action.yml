@@ -11,10 +11,10 @@ inputs:
     required: true
   tags:
     description: 'A comma separated list of tags'
-    required: false
+    required: true
   platforms:
     description: 'A comma separated list of platform targets e.g. linux/amd64,linux/arm64'
-    required: false
+    required: true
   stages:
     description: 'A comma separated list of stages to build'
     required: true
@@ -22,3 +22,4 @@ inputs:
 runs:
   using: 'docker'
   image: 'Dockerfile'
+  args: ["-f" ${{inputs.dockerfile}} "--image" ${{inputs.image}} "--tags" ${{inputs.tags}} "--platforms" ${{inputs.platforms}} "--stages" ${{input.stages}}]

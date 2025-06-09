@@ -74,7 +74,7 @@ target \"{{name}}\" {
         (fs/delete config-file)))))
 
 (defn usage [options-summary]
-  (prep-usage ["Usage: build [options]"
+  (prep-usage ["Usage: bake [options]"
                ""
                "Bakes a multi-stage, multi-platform docker image with multiple tags"
                ""

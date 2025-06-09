@@ -5,5 +5,7 @@ FROM ghcr.io/manetu/ci-tools:3.1
 COPY entrypoint.sh /entrypoint.sh
 COPY scripts/ /usr/local/bin/
 
+RUN bake -h
+
 # Code file to execute when the docker container starts up (`entrypoint.sh`)
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/bake"]
