@@ -24,6 +24,7 @@ target \"_common\" {
 
 target \"default\" {
   inherits = [\"_common\"]
+  tags = {{{default-tags}}}
 }
 
 {{#targets}}
@@ -53,10 +54,11 @@ target \"{{name}}\" {
 (defn render-target [{:keys [image tags] :as options} stage]
   {:name stage :tags (render-csv (map (fn [tag] (str image ":" tag "-" stage)) tags))})
 
-(defn render-template [{:keys [stages] :as options}]
+(defn render-template [{:keys [image tags stages] :as options}]
   (-> options
       (assoc :all-stages (render-csv (conj stages "default"))
-             :targets (map (partial render-target options) stages))
+             :targets (map (partial render-target options) stages)
+             :default-tags (render-csv (map (fn [tag] (str image ":" tag)) tags)))
       (m/update-existing :platforms render-csv)
       (as-> $ (pg/render-string hcl-template $))))
 
